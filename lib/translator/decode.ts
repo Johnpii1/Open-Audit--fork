@@ -3,9 +3,27 @@
  *
  * Soroban events encode their topics and data as XDR (External Data Representation).
  * These helpers provide simplified decoding for common patterns.
+ *
+ * Supported ScVal Types:
+ * - Simple types: Address, U128, I128, String, Symbol, Bytes
+ * - Complex types: Map (ScMap), Vector (ScVec), Enum
+ *
+ * Note: This implementation uses mock decoding for demonstration purposes.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() for full XDR parsing.
+ *
+ * Security: All hex inputs are validated and sanitized to prevent XSS attacks.
  */
 
-import type { DecodedAddress, DecodedAmount } from "./types";
+import type {
+  DecodedAddress,
+  DecodedAmount,
+  DecodedScVal,
+  DecodedMap,
+  DecodedMapEntry,
+  DecodedVec,
+  DecodedEnum,
+  ScValType,
+} from "./types";
 
 const STROOP_DIVISOR = BigInt(10_000_000);
 
@@ -161,4 +179,244 @@ export function truncateHex(hex: string, chars: number = 8): string {
 
   if (sanitizedHex.length <= chars * 2 + 2) return sanitizedHex;
   return `${sanitizedHex.slice(0, chars + 2)}...${sanitizedHex.slice(-chars)}`;
+}
+
+// ── Complex ScVal Type Decoding ─────────────────────────────────────────────
+
+/**
+ * Detects the ScVal type from hex-encoded XDR.
+ * This is a simplified mock implementation.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() to get the actual type.
+ */
+export function detectScValType(hex: string): ScValType {
+  const sanitizedHex = sanitizeHex(hex);
+  if (!sanitizedHex) return "Void";
+
+  // Mock: Simple heuristics to detect type from hex patterns
+  // In production, this would use actual XDR parsing
+  const cleanHex = sanitizedHex.slice(2);
+
+  // Vec type indicator (simplified)
+  if (cleanHex.startsWith("00000010")) return "Vec";
+  // Map type indicator (simplified)
+  if (cleanHex.startsWith("00000011")) return "Map";
+  // Address type indicator (32 bytes)
+  if (cleanHex.length === 64) return "Address";
+  // String/Symbol type indicator
+  if (cleanHex.startsWith("0000000e") || cleanHex.startsWith("0000000f")) return "String";
+  // Default to U128 for numeric-looking data
+  if (/^[0-9a-f]{32}$/.test(cleanHex)) return "U128";
+
+  return "Bytes";
+}
+
+/**
+ * Decodes a Soroban Map (ScMap) from hex-encoded XDR.
+ * Mock implementation that parses a simplified map structure.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() and extract ScMap.
+ */
+export function decodeMap(hex: string): DecodedMap {
+  const sanitizedHex = sanitizeHex(hex);
+  if (!sanitizedHex) {
+    return {
+      type: "Map",
+      entries: [],
+      summary: "Invalid map data",
+    };
+  }
+
+  // Mock: Parse a simplified map structure from hex
+  // In production, this would use actual XDR parsing
+  const cleanHex = sanitizedHex.slice(2);
+  const entries: DecodedMapEntry[] = [];
+
+  // Simplified mock: assume map entries are encoded in pairs
+  // This is a placeholder for real XDR parsing
+  try {
+    // Mock: Extract 2 key-value pairs from the hex for demonstration
+    const entryCount = Math.min(2, Math.floor(cleanHex.length / 32));
+
+    for (let i = 0; i < entryCount; i++) {
+      const offset = i * 32;
+      const keyHex = `0x${cleanHex.slice(offset, offset + 16)}`;
+      const valHex = `0x${cleanHex.slice(offset + 16, offset + 32)}`;
+
+      entries.push({
+        key: {
+          type: detectScValType(keyHex),
+          value: truncateHex(keyHex, 4),
+          hex: keyHex,
+        },
+        value: {
+          type: detectScValType(valHex),
+          value: truncateHex(valHex, 4),
+          hex: valHex,
+        },
+      });
+    }
+  } catch {
+    // If parsing fails, return empty map
+  }
+
+  const summary =
+    entries.length > 0
+      ? `Map(${entries.length} entries: ${entries.map((e) => e.key.value).join(", ")})`
+      : "Map(empty)";
+
+  return {
+    type: "Map",
+    entries,
+    summary,
+  };
+}
+
+/**
+ * Decodes a Soroban Vector (ScVec) from hex-encoded XDR.
+ * Mock implementation that parses a simplified vector structure.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() and extract ScVec.
+ */
+export function decodeVec(hex: string): DecodedVec {
+  const sanitizedHex = sanitizeHex(hex);
+  if (!sanitizedHex) {
+    return {
+      type: "Vec",
+      elements: [],
+      summary: "Invalid vector data",
+    };
+  }
+
+  // Mock: Parse a simplified vector structure from hex
+  // In production, this would use actual XDR parsing
+  const cleanHex = sanitizedHex.slice(2);
+  const elements: DecodedScVal[] = [];
+
+  // Simplified mock: assume vector elements are 16-byte chunks
+  try {
+    const elementCount = Math.min(4, Math.floor(cleanHex.length / 16));
+
+    for (let i = 0; i < elementCount; i++) {
+      const offset = i * 16;
+      const elemHex = `0x${cleanHex.slice(offset, offset + 16)}`;
+
+      elements.push({
+        type: detectScValType(elemHex),
+        value: truncateHex(elemHex, 4),
+        hex: elemHex,
+      });
+    }
+  } catch {
+    // If parsing fails, return empty vector
+  }
+
+  const summary =
+    elements.length > 0
+      ? `Vec[${elements.map((e) => e.value).join(", ")}]`
+      : "Vec[]";
+
+  return {
+    type: "Vec",
+    elements,
+    summary,
+  };
+}
+
+/**
+ * Decodes a Soroban Enum from hex-encoded XDR.
+ * Mock implementation that parses a simplified enum structure.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() and extract enum discriminant.
+ */
+export function decodeEnum(hex: string, knownVariants?: Record<string, string>): DecodedEnum {
+  const sanitizedHex = sanitizeHex(hex);
+  if (!sanitizedHex) {
+    return {
+      type: "Enum",
+      variant: "unknown",
+      summary: "Invalid enum data",
+    };
+  }
+
+  // Mock: Parse a simplified enum structure from hex
+  // In production, this would use actual XDR parsing
+  const cleanHex = sanitizedHex.slice(2);
+
+  // Simplified mock: extract discriminant from first 4 bytes
+  const discriminantHex = cleanHex.slice(0, 8);
+  const discriminant = parseInt(discriminantHex, 16);
+
+  // Map discriminant to variant name (mock implementation)
+  const variantNames: Record<number, string> = {
+    0: "Default",
+    1: "Some",
+    2: "None",
+    3: "Ok",
+    4: "Error",
+  };
+
+  const variant = knownVariants?.[discriminantHex] ?? variantNames[discriminant] ?? `Variant_${discriminant}`;
+
+  // Check if there's a payload (remaining hex after discriminant)
+  const payloadHex = cleanHex.slice(8);
+  let value: DecodedScVal | undefined;
+
+  if (payloadHex.length > 0) {
+    value = {
+      type: detectScValType(`0x${payloadHex}`),
+      value: truncateHex(`0x${payloadHex}`, 4),
+      hex: `0x${payloadHex}`,
+    };
+  }
+
+  const summary = value ? `Enum::${variant}(${value.value})` : `Enum::${variant}`;
+
+  return {
+    type: "Enum",
+    variant,
+    value,
+    summary,
+  };
+}
+
+/**
+ * Generic ScVal decoder that dispatches to the appropriate decoder based on type.
+ * This is a simplified mock implementation.
+ * In production, use StellarSdk.xdr.ScVal.fromXDR() for full XDR parsing.
+ */
+export function decodeScVal(hex: string): DecodedScVal | DecodedMap | DecodedVec | DecodedEnum {
+  const sanitizedHex = sanitizeHex(hex);
+  if (!sanitizedHex) {
+    return {
+      type: "Void",
+      value: "invalid",
+      hex: "",
+    };
+  }
+
+  const type = detectScValType(sanitizedHex);
+
+  switch (type) {
+    case "Map":
+      return decodeMap(sanitizedHex);
+    case "Vec":
+      return decodeVec(sanitizedHex);
+    case "Address":
+      const address = decodeAddress(sanitizedHex);
+      return {
+        type: "Address",
+        value: address.short,
+        hex: sanitizedHex,
+      };
+    case "U128":
+      const amount = decodeAmount(sanitizedHex);
+      return {
+        type: "U128",
+        value: amount.formatted,
+        hex: sanitizedHex,
+      };
+    default:
+      return {
+        type,
+        value: truncateHex(sanitizedHex, 6),
+        hex: sanitizedHex,
+      };
+  }
 }
