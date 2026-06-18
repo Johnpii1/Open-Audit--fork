@@ -130,14 +130,27 @@ function StatusBadge({ status }: { status: TranslatedEvent["status"] }): React.J
 
 function SkeletonRow(): React.JSX.Element {
   return (
-    <TableRow>
-      {[1, 2, 3, 4, 5].map(function (i) {
-        return (
-          <TableCell key={i}>
-            <div className="h-4 bg-muted animate-pulse rounded" />
-          </TableCell>
-        );
-      })}
+    <TableRow className="hover:bg-transparent">
+      <TableCell>
+        <div className="h-5 w-20 bg-muted animate-pulse rounded-full" />
+      </TableCell>
+      <TableCell>
+        <div className="h-3.5 w-14 bg-muted animate-pulse rounded" />
+      </TableCell>
+      <TableCell>
+        <div className="space-y-1.5">
+          <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+          <div className="h-4 w-64 bg-muted animate-pulse rounded" />
+        </div>
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <div className="h-3.5 w-24 bg-muted animate-pulse rounded" />
+      </TableCell>
+      <TableCell>
+        <div className="flex justify-end">
+          <div className="h-7 w-20 bg-muted animate-pulse rounded-md" />
+        </div>
+      </TableCell>
     </TableRow>
   );
 }

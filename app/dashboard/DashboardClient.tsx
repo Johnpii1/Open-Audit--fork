@@ -171,7 +171,7 @@ export function DashboardClient(): React.JSX.Element {
       </section>
 
       {/* Stats */}
-      {!isLoading && <StatsBar events={events} />}
+      <StatsBar events={events} isLoading={isLoading} />
 
       {/* Feed */}
       <section aria-label="Event feed">
