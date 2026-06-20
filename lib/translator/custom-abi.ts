@@ -17,6 +17,7 @@
  */
 
 import { decodeAddress, decodeAmount, decodeEventName, truncateHex } from "./decode";
+import { RegistryTemplateException } from "../errors";
 import type {
   CustomAbi,
   CustomAbiEvent,
@@ -24,6 +25,7 @@ import type {
   RawEvent,
   TranslationBlueprint,
   TranslationResult,
+  Language,
 } from "./types";
 
 /** localStorage key under which uploaded ABIs are stored. */
@@ -61,13 +63,17 @@ export function parseCustomAbi(input: unknown, fallbackContractId?: string): Cus
     (fallbackContractId ? fallbackContractId.trim() : null);
 
   if (!contractId) {
-    throw new Error("A Contract ID is required to associate this ABI with a contract.");
+    throw new RegistryTemplateException(
+      "A Contract ID is required to associate this ABI with a contract.",
+      { operation: "parseCustomAbi" }
+    );
   }
 
   const eventRecords = collectEventRecords(input);
   if (eventRecords.length === 0) {
-    throw new Error(
-      "No event definitions were found. Expected an `events` array or a contract spec with event entries."
+    throw new RegistryTemplateException(
+      "No event definitions were found. Expected an `events` array or a contract spec with event entries.",
+      { contractId, operation: "parseCustomAbi" }
     );
   }
 
@@ -137,8 +143,8 @@ export function customAbiToBlueprint(abi: CustomAbi): TranslationBlueprint {
   return {
     contractId: abi.contractId,
     contractName: `${abi.contractName} (Custom ABI)`,
-    translate: function (event: RawEvent): TranslationResult | null {
-      return translateWithAbi(abi, event);
+    translate: function (event: RawEvent, lang: Language): TranslationResult | null {
+      return translateWithAbi(abi, event, lang);
     },
   };
 }
@@ -153,7 +159,7 @@ export function buildCustomBlueprints(abis: CustomAbi[]): Map<string, Translatio
 }
 
 /** Attempts to translate an event using a custom ABI. */
-function translateWithAbi(abi: CustomAbi, event: RawEvent): TranslationResult | null {
+function translateWithAbi(abi: CustomAbi, event: RawEvent, lang: Language): TranslationResult | null {
   const topic0 = event.topics[0] ?? "";
   const decodedName = decodeEventName(topic0);
 
