@@ -147,6 +147,9 @@ app.prepare().then(async () => {
     },
   });
 
+  // Start the retention pruner cron (no-op if RETENTION_ENABLED=false)
+  schedulePruner();
+
   httpServer.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);
   });
